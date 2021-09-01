@@ -269,65 +269,83 @@ const ml::Operand ResNet::loop(const ml::GraphBuilder& builder,
 const ml::Operand ResNet::LoadNCHW(const ml::GraphBuilder& builder, bool softmax) {
     mWeightsPath = mWeightsPath + "resnetv24_";
     const ml::Operand input = utils::BuildInput(builder, "input", {1, 3, 224, 224});
-
+    // 602112
     const ml::Operand bn1 = BuildBatchNorm(builder, input, "0", "", false);
     utils::Conv2dOptions conv0Options;
     conv0Options.padding = {3, 3, 3, 3};
     conv0Options.strides = {2, 2};
+    // 3211264
     const ml::Operand conv0 = BuildNchwConv(builder, bn1, "0", "", &conv0Options);
+    // 3211264
     const ml::Operand bn2 = BuildBatchNorm(builder, conv0, "1", "");
     utils::Pool2dOptions maxPoolOptions;
     maxPoolOptions.windowDimensions = {3, 3};
     maxPoolOptions.padding = {1, 1, 1, 1};
     maxPoolOptions.strides = {2, 2};
+    // 802816
     const ml::Operand pool1 = builder.MaxPool2d(bn2, maxPoolOptions.AsPtr());
 
-    // Stage 1
+    // Stage 1 3211264
     const ml::Operand bottleneck1 =
         BuildNchwBottlenectV2(builder, pool1, "1", {"0", "0", "1", "2"}, true);
+    // 3211264
     const ml::Operand bottleneck2 =
         BuildNchwBottlenectV2(builder, bottleneck1, "1", {"3", "4", "5", "6"});
+    // 3211264
     const ml::Operand bottleneck3 =
         BuildNchwBottlenectV2(builder, bottleneck2, "1", {"6", "7", "8", "9"});
 
-    // Stage 2
+    // // Stage 2 1605632
     const ml::Operand bottleneck4 =
         BuildNchwBottlenectV2(builder, bottleneck3, "2", {"0", "0", "1", "2"}, true, 2);
+    // 1605632
     const ml::Operand bottleneck5 =
         BuildNchwBottlenectV2(builder, bottleneck4, "2", {"3", "4", "5", "6"});
+    // 1605632
     const ml::Operand bottleneck6 =
         BuildNchwBottlenectV2(builder, bottleneck5, "2", {"6", "7", "8", "9"});
+    // 1605632
     const ml::Operand bottleneck7 =
         BuildNchwBottlenectV2(builder, bottleneck6, "2", {"9", "10", "11", "12"});
 
-    // Stage 3
+    // // Stage 3 //802816
     const ml::Operand bottleneck8 =
         BuildNchwBottlenectV2(builder, bottleneck7, "3", {"0", "0", "1", "2"}, true, 2);
+    // 802816
     const ml::Operand bottleneck9 =
         BuildNchwBottlenectV2(builder, bottleneck8, "3", {"3", "4", "5", "6"});
+    // 802816
     const ml::Operand bottleneck10 =
         BuildNchwBottlenectV2(builder, bottleneck9, "3", {"6", "7", "8", "9"});
+    // 802816
     const ml::Operand bottleneck11 =
         BuildNchwBottlenectV2(builder, bottleneck10, "3", {"9", "10", "11", "12"});
+    // 802816
     const ml::Operand bottleneck12 =
         BuildNchwBottlenectV2(builder, bottleneck11, "3", {"12", "13", "14", "15"});
+    // 802816
     const ml::Operand bottleneck13 =
         BuildNchwBottlenectV2(builder, bottleneck12, "3", {"15", "16", "17", "18"});
 
-    // Stage 4
+    // // Stage 4 401408
     const ml::Operand bottleneck14 =
         BuildNchwBottlenectV2(builder, bottleneck13, "4", {"0", "0", "1", "2"}, true, 2);
+    // 401408
     const ml::Operand bottleneck15 =
         BuildNchwBottlenectV2(builder, bottleneck14, "4", {"3", "4", "5", "6"});
+    // 401408
     const ml::Operand bottleneck16 =
         BuildNchwBottlenectV2(builder, bottleneck15, "4", {"6", "7", "8", "9"});
-
+    // 401408
     const ml::Operand bn3 = BuildBatchNorm(builder, bottleneck16, "2", "");
+    // 8192
     const ml::Operand pool2 = builder.AveragePool2d(bn3);
     const std::vector<int32_t> newShape = {1, -1};
     const ml::Operand reshape = builder.Reshape(pool2, newShape.data(), newShape.size());
+    // 4000
     const ml::Operand gemm = BuildGemm(builder, reshape, "0");
-    const ml::Operand output = softmax ? builder.Softmax(gemm) : gemm;
+
+    const ml::Operand output = conv0;
     return output;
 }
 

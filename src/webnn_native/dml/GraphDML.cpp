@@ -1448,6 +1448,7 @@ namespace webnn_native { namespace dml {
             auto namedOutputs = outputs->GetRecords();
             if (namedOutputs.find(outputName) != namedOutputs.end()) {
                 const ArrayBufferView* output = namedOutputs[outputName];
+                bufferLength = std::min(static_cast<size_t>(bufferLength), output->byteLength);
                 if (output->byteLength >= bufferLength) {
                     memcpy(static_cast<int8_t*>(output->buffer) + output->byteOffset, outputBuffer,
                            bufferLength);

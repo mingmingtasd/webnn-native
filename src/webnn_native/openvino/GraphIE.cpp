@@ -986,7 +986,10 @@ namespace webnn_native { namespace ie {
             status = ie_blob_get_cbuffer(outputBlob, &outputBuffer);
             int bufferLength;
             status = ie_blob_byte_size(outputBlob, &bufferLength);
+            dawn::ErrorLog()<<"bufferLength===="<<bufferLength;
+            bufferLength = std::min(static_cast<size_t>(bufferLength), output->byteLength);
             if (output->byteLength >= static_cast<size_t>(bufferLength)) {
+                dawn::ErrorLog()<<"output->byteLength===="<<output->byteLength;
                 memcpy(static_cast<int8_t*>(output->buffer) + output->byteOffset,
                        outputBuffer.cbuffer, bufferLength);
             }

@@ -496,6 +496,11 @@ IEStatusCode ngraph_convolution(const ngraph_node_t* input,
   auto conv2d = std::make_shared<ngraph::op::v1::Convolution>(
       input->object, filter->object, strides_vector, pad_begin, pad_end,
       dilations_vector, GetAutoPad(mode));
+  auto shape = conv2d->get_shape();
+  for (size_t i = 0; i < shape.size(); ++i) {
+    std::cout << shape[i]<<" ";
+  }
+  std::cout << "====================" << std::endl;
   CREATE_NODE_AND_CATCH_EXCEPTIONS(conv2d, node);
 }
 
