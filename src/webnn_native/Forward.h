@@ -23,6 +23,8 @@ class Ref;
 
 namespace webnn_native {
 
+    enum class ObjectType : uint32_t;
+
     class CompilationBase;
     class GraphBase;
     class GraphBuilderBase;

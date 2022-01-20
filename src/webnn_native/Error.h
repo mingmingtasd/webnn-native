@@ -74,6 +74,14 @@ namespace webnn_native {
 #define DAWN_MAKE_ERROR(TYPE, MESSAGE) \
     ::webnn_native::ErrorData::Create(TYPE, MESSAGE, __FILE__, __func__, __LINE__)
 #define DAWN_VALIDATION_ERROR(MESSAGE) DAWN_MAKE_ERROR(InternalErrorType::Validation, MESSAGE)
+
+#define DAWN_INVALID_IF(EXPR, MESSAGE)                                  \
+    if (DAWN_UNLIKELY(EXPR)) {                                          \
+        return DAWN_MAKE_ERROR(InternalErrorType::Validation, MESSAGE); \
+    }                                                                   \
+    for (;;)                                                            \
+    break
+
 #define DAWN_DEVICE_LOST_ERROR(MESSAGE) DAWN_MAKE_ERROR(InternalErrorType::DeviceLost, MESSAGE)
 #define DAWN_INTERNAL_ERROR(MESSAGE) DAWN_MAKE_ERROR(InternalErrorType::Internal, MESSAGE)
 #define DAWN_UNIMPLEMENTED_ERROR(MESSAGE) \

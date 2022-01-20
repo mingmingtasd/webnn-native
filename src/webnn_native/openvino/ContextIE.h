@@ -31,6 +31,7 @@ namespace webnn_native { namespace ie {
 
       private:
         GraphBase* CreateGraphImpl() override;
+        void DestroyImpl() override;
 
         ie_core_t* mInferEngineCore;
     };
