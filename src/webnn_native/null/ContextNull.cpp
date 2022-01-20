@@ -45,6 +45,10 @@ namespace webnn_native { namespace null {
         return new Graph(this);
     }
 
+    void Context::DestroyImpl() {
+
+    }
+
     // GraphBuilder
     GraphBuilder::GraphBuilder(ContextBase* context) : GraphBuilderBase(context) {
     }

@@ -14,6 +14,8 @@
 
 #include "webnn_native/ObjectBase.h"
 
+#include <mutex>
+
 namespace webnn_native {
     static constexpr uint64_t kErrorPayload = 0;
     static constexpr uint64_t kNotErrorPayload = 1;
@@ -31,6 +33,56 @@ namespace webnn_native {
 
     bool ObjectBase::IsError() const {
         return GetRefCountPayload() == kErrorPayload;
+    }
+
+    ApiObjectBase::ApiObjectBase(ContextBase* context, const char* label) : ObjectBase(context) {
+        if (label) {
+            mLabel = label;
+        }
+    }
+
+    ApiObjectBase::ApiObjectBase(ContextBase* context, ErrorTag tag) : ObjectBase(context, tag) {
+    }
+
+    ApiObjectBase::ApiObjectBase(ContextBase* context, LabelNotImplementedTag tag)
+        : ObjectBase(context) {
+    }
+
+    ApiObjectBase::~ApiObjectBase() {
+        ASSERT(!IsAlive());
+    }
+
+    void ApiObjectBase::APISetLabel(const char* label) {
+        mLabel = label;
+        SetLabelImpl();
+    }
+
+    const std::string& ApiObjectBase::GetLabel() const {
+        return mLabel;
+    }
+
+    void ApiObjectBase::SetLabelImpl() {
+    }
+
+    bool ApiObjectBase::IsAlive() const {
+        return IsInList();
+    }
+
+    void ApiObjectBase::DeleteThis() {
+        Destroy();
+        RefCounted::DeleteThis();
+    }
+
+    void ApiObjectBase::TrackInContext() {
+        ASSERT(GetContext() != nullptr);
+        GetContext()->TrackObject(this);
+    }
+
+    void ApiObjectBase::Destroy() {
+        const std::lock_guard<std::mutex> lock(*GetContext()->GetObjectListMutex(GetType()));
+        if (RemoveFromList()) {
+            DestroyImpl();
+        }
     }
 
 }  // namespace webnn_native

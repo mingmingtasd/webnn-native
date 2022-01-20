@@ -63,9 +63,72 @@ namespace webnn_native {
                << ")";
         }
 
-        // Still forward device loss and internal errors to the error scopes so they
+        // Still forward context loss and internal errors to the error scopes so they
         // all reject.
         mCurrentErrorScope->HandleError(ToMLErrorType(error->GetType()), ss.str().c_str());
     }
+
+    ContextBase::State ContextBase::GetState() const {
+        return mState;
+    }
+
+    MaybeError ContextBase::ValidateObject(const ApiObjectBase* object) const {
+        ASSERT(object != nullptr);
+        DAWN_INVALID_IF(object->GetContext() != this,
+                        "%s is associated with %s, and cannot be used with %s.", object,
+                        object->GetContext(), this);
+
+        // TODO(dawn:563): Preserve labels for error objects.
+        DAWN_INVALID_IF(object->IsError(), "%s is invalid.", object);
+
+        return {};
+    }
+
+    MaybeError ContextBase::ValidateIsAlive() const {
+        DAWN_INVALID_IF(mState != State::Alive, "%s is lost.", this);
+        return {};
+    }
+
+    ContextBase::State ContextBase::GetState() const {
+        return mState;
+    }
+
+    bool ContextBase::IsLost() const {
+        ASSERT(mState != State::BeingCreated);
+        return mState != State::Alive;
+    }
+
+    void ContextBase::TrackObject(ApiObjectBase* object) {
+        ApiObjectList& objectList = mObjectLists[object->GetType()];
+        std::lock_guard<std::mutex> lock(objectList.mutex);
+        object->InsertBefore(objectList.objects.head());
+    }
+
+    std::mutex* ContextBase::GetObjectListMutex(ObjectType type) {
+        return &mObjectLists[type].mutex;
+    }
+
+    void ContextBase::APILoseForTesting() {
+        if (mState != State::Alive) {
+            return;
+        }
+
+        HandleError(InternalErrorType::Internal, "Context lost for testing");
+    }
+
+    const std::string& ContextBase::GetLabel() const {
+        return mLabel;
+    }
+
+    void ContextBase::APISetLabel(const char* label) {
+        mLabel = label;
+        SetLabelImpl();
+    }
+
+    void ContextBase::SetLabelImpl() {
+    }
+
+    void ContextBase::APIDestroy() {
+ 
 
 }  // namespace webnn_native

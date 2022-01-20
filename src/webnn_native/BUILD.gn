@@ -56,6 +56,8 @@ webnn_json_generator("webnn_native_utils_gen") {
     "src/webnn_native/webnn_structs_autogen.cpp",
     "src/webnn_native/ValidationUtils_autogen.h",
     "src/webnn_native/ValidationUtils_autogen.cpp",
+    "src/webnn_native/ObjectType_autogen.h",
+    "src/webnn_native/ObjectType_autogen.cpp",
     "src/webnn_native/webnn_platform_autogen.h",
   ]
 }
