@@ -29,6 +29,7 @@ namespace webnn_native { namespace null {
 
       private:
         GraphBase* CreateGraphImpl() override;
+                void DestroyImpl() override;
     };
 
     // GraphBuilder

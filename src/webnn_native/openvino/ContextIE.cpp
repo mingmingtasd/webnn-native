@@ -39,4 +39,8 @@ namespace webnn_native { namespace ie {
         return new Graph(this);
     }
 
+    void Context::DestroyImpl() {
+
+    }
+
 }}  // namespace webnn_native::ie

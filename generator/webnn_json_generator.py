@@ -353,6 +353,14 @@ class MultiGeneratorFromWebnnJSON(Generator):
             renders.append(
                 FileRender('webnn_native/ProcTable.cpp',
                            'src/webnn_native/ProcTable.cpp', frontend_params))
+            renders.append(
+                FileRender('webnn_native/ObjectType.h',
+                           'src/webnn_native/ObjectType_autogen.h',
+                           frontend_params))
+            renders.append(
+                FileRender('webnn_native/ObjectType.cpp',
+                           'src/webnn_native/ObjectType_autogen.cpp',
+                           frontend_params))
 
         if 'webnn_wire' in targets:
             additional_params = compute_wire_params(api_params, wire_json)
