@@ -40,7 +40,8 @@ namespace webnn_native {
         ~ObjectBase() override = default;
 
       private:
-        Ref<ContextBase> mContext;
+      // Pointer to owning mContext.
+        ContextBase* mContext;
     };
 
     class ApiObjectBase : public ObjectBase, public LinkNode<ApiObjectBase> {

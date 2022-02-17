@@ -35,7 +35,7 @@ namespace webnn_native {
 
         bool ConsumedError(MaybeError maybeError) {
             if (DAWN_UNLIKELY(maybeError.IsError())) {
-                HandleError(maybeError.AcquireError());
+                ConsumeError(maybeError.AcquireError());
                 return true;
             }
             return false;
@@ -94,7 +94,7 @@ namespace webnn_native {
         // Create concrete model.
         virtual GraphBase* CreateGraphImpl() = 0;
 
-        void HandleError(std::unique_ptr<ErrorData> error);
+        void ConsumeError(std::unique_ptr<ErrorData> error);
 
         // DestroyImpl is used to clean up and release resources used by device, does not wait for
         // GPU or check errors.
@@ -103,8 +103,10 @@ namespace webnn_native {
         virtual void SetLabelImpl();
         std::string mLabel;
 
-        Ref<ErrorScope> mRootErrorScope;
-        Ref<ErrorScope> mCurrentErrorScope;
+        ml::ErrorCallback mUncapturedErrorCallback = nullptr;
+        void* mUncapturedErrorUserdata = nullptr;
+
+        std::unique_ptr<ErrorScopeStack> mErrorScopeStack;
 
         ContextOptions mContextOptions;
 

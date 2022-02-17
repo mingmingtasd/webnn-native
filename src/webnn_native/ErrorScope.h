@@ -18,52 +18,39 @@
 
 #include "webnn_native/webnn_platform.h"
 
-#include "common/RefCounted.h"
-
 #include <string>
+#include <vector>
 
 namespace webnn_native {
 
-    // Errors can be recorded into an ErrorScope by calling |HandleError|.
-    // Because an error scope should not resolve until contained
-    // commands are complete, calling the callback is deferred until it is
-    // destructed. In-flight commands or asynchronous events should hold a reference
-    // to the ErrorScope for their duration.
-    //
-    // Because parent ErrorScopes should not resolve before child ErrorScopes,
-    // ErrorScopes hold a reference to their parent.
-    //
-    // To simplify ErrorHandling, there is a sentinel root error scope which has
-    // no parent. All uncaptured errors are handled by the root error scope. Its
-    // callback is called immediately once it encounters an error.
-    class ErrorScope final : public RefCounted {
+class ErrorScope {
       public:
-        ErrorScope();  // Constructor for the root error scope.
-        ErrorScope(ml::ErrorFilter errorFilter, ErrorScope* parent);
-
-        void SetCallback(ml::ErrorCallback callback, void* userdata);
-        ErrorScope* GetParent();
-
-        void HandleError(ml::ErrorType type, const char* message);
-        void UnlinkForShutdown();
+        ml::ErrorType GetErrorType() const;
+        const char* GetErrorMessage() const;
 
       private:
-        ~ErrorScope() override;
-        bool IsRoot() const;
-        void RunNonRootCallback();
+        friend class ErrorScopeStack;
+        explicit ErrorScope(ml::ErrorFilter errorFilter);
 
-        static void HandleErrorImpl(ErrorScope* scope, ml::ErrorType type, const char* message);
-        static void UnlinkForShutdownImpl(ErrorScope* scope);
-
-        ml::ErrorFilter mErrorFilter = ml::ErrorFilter::None;
-        Ref<ErrorScope> mParent = nullptr;
-        bool mIsRoot;
-
-        ml::ErrorCallback mCallback = nullptr;
-        void* mUserdata = nullptr;
-
-        ml::ErrorType mErrorType = ml::ErrorType::NoError;
+        ml::ErrorType mMatchedErrorType;
+        ml::ErrorType mCapturedError = ml::ErrorType::NoError;
         std::string mErrorMessage = "";
+    };
+
+    class ErrorScopeStack {
+      public:
+        void Push(ml::ErrorFilter errorFilter);
+        ErrorScope Pop();
+
+        bool Empty() const;
+
+        // Pass an error to the scopes in the stack. Returns true if one of the scopes
+        // captured the error. Returns false if the error should be forwarded to the
+        // uncaptured error callback.
+        bool HandleError(ml::ErrorType type, const char* message);
+
+      private:
+        std::vector<ErrorScope> mScopes;
     };
 
 }  // namespace webnn_native

@@ -16,7 +16,9 @@
 #define TESTS_WEBNN_TEST_H_
 
 #include "examples/SampleUtils.h"
-#include "gtest/gtest.h"
+
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 class WebnnTest : public testing::Test {
   protected:
@@ -26,7 +28,7 @@ class WebnnTest : public testing::Test {
     void TearDown() override;
 
     const ml::Context& GetContext();
-    void StartExpectContextError();
+    void StartExpectContextError(testing::Matcher<std::string> errorMatcher);
     bool EndExpectContextError();
     std::string GetLastErrorMessage() const;
 
@@ -35,6 +37,7 @@ class WebnnTest : public testing::Test {
     std::string mErrorMessage;
     bool mExpectError = false;
     bool mError = false;
+    testing::Matcher<std::string> mErrorMatcher;
 };
 
 void InitWebnnEnd2EndTestEnvironment(ml::ContextOptions const* options = nullptr);

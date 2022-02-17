@@ -234,7 +234,7 @@ class MultiGeneratorFromWebnnJSON(Generator):
     def get_file_renders(self, args):
         with open(args.webnn_json) as f:
             loaded_json = json.loads(f.read())
-        api_params = parse_json(loaded_json)
+        api_params = parse_json(loaded_json, enabled_tags=['dawn', 'native', 'deprecated'])
 
         targets = args.targets.split(',')
 

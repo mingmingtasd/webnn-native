@@ -25,8 +25,6 @@ namespace webnn_native {
         if (options != nullptr) {
             mContextOptions = *options;
         }
-        mRootErrorScope = AcquireRef(new ErrorScope());
-        mCurrentErrorScope = mRootErrorScope.Get();
     }
 
     GraphBase* ContextBase::CreateGraph() {
@@ -52,27 +50,65 @@ namespace webnn_native {
         if (ConsumedError(ValidateErrorFilter(filter))) {
             return;
         }
-        mCurrentErrorScope = AcquireRef(new ErrorScope(filter, mCurrentErrorScope.Get()));
+          mErrorScopeStack->Push(filter);
     }
 
     bool ContextBase::PopErrorScope(ml::ErrorCallback callback, void* userdata) {
-        if (DAWN_UNLIKELY(mCurrentErrorScope.Get() == mRootErrorScope.Get())) {
+        if (mErrorScopeStack->Empty()) {
             return false;
         }
-        mCurrentErrorScope->SetCallback(callback, userdata);
-        mCurrentErrorScope = Ref<ErrorScope>(mCurrentErrorScope->GetParent());
+        ErrorScope scope = mErrorScopeStack->Pop();
+        if (callback != nullptr) {
+            // TODO(crbug.com/dawn/1122): Call callbacks only on wgpuInstanceProcessEvents
+            callback(static_cast<MLErrorType>(scope.GetErrorType()), scope.GetErrorMessage(),
+                     userdata);
+        }
 
         return true;
     }
 
     void ContextBase::SetUncapturedErrorCallback(ml::ErrorCallback callback, void* userdata) {
-        mRootErrorScope->SetCallback(callback, userdata);
+           // The registered callback function and userdata pointer are stored and used by deferred
+        // callback tasks, and after setting a different callback (especially in the case of
+        // resetting) the resources pointed by such pointer may be freed. Flush all deferred
+        // callback tasks to guarantee we are never going to use the previous callback after
+        // this call.
+        if (IsLost()) {
+            return;
+        }
+        // TODO(mingming):
+        //FlushCallbackTaskQueue();
+        mUncapturedErrorCallback = callback;
+        mUncapturedErrorUserdata = userdata;
     }
 
     void ContextBase::HandleError(InternalErrorType type, const char* message) {
+        if (type == InternalErrorType::DeviceLost) {
+            mState = State::Disconnected;
+            // TODO(mingming)
+        } else if (type == InternalErrorType::Internal) {
+            mState = State::BeingDisconnected;
+            // TODO(mingming)
+            // Now everything is as if the device was lost.
+            type = InternalErrorType::DeviceLost;
+        }
+
+        if (type == InternalErrorType::DeviceLost) {
+            // Still forward device loss errors to the error scopes so they all reject.
+            mErrorScopeStack->HandleError(ToMLErrorType(type), message);
+        } else {
+            // Pass the error to the error scope stack and call the uncaptured error callback
+            // if it isn't handled. DeviceLost is not handled here because it should be
+            // handled by the lost callback.
+            bool captured = mErrorScopeStack->HandleError(ToMLErrorType(type), message);
+            if (!captured && mUncapturedErrorCallback != nullptr) {
+                mUncapturedErrorCallback(static_cast<MLErrorType>(ToMLErrorType(type)), message,
+                                         mUncapturedErrorUserdata);
+            }
+        }
     }
 
-    void ContextBase::HandleError(std::unique_ptr<ErrorData> error) {
+     void ContextBase::ConsumeError(std::unique_ptr<ErrorData> error) {
         ASSERT(error != nullptr);
         std::ostringstream ss;
         ss << error->GetMessage();
@@ -81,9 +117,7 @@ namespace webnn_native {
                << ")";
         }
 
-        // Still forward context loss and internal errors to the error scopes so they
-        // all reject.
-        mCurrentErrorScope->HandleError(ToMLErrorType(error->GetType()), ss.str().c_str());
+        HandleError(error->GetType(), error->GetFormattedMessage().c_str());
     }
 
     MaybeError ContextBase::ValidateObject(const ApiObjectBase* object) const {

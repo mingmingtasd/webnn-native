@@ -146,7 +146,7 @@ config("dawn_internal") {
     cflags += [ "/wd4063" ]
   }
 
-  if (is_clang && (webnn_enable_dml || webnn_enable_mlas)) {
+  if (is_clang && (webnn_enable_dml || webnn_enable_mlas|| webnn_enable_openvino)) {
     cflags += [
       # Allow the use of DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE); in DirectML.h
       "-Wno-extra-semi",

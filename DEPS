@@ -37,7 +37,7 @@ deps = {
 
   # Dependencies required for code generator and infrastructure code.
   'third_party/dawn': {
-    'url': '{dawn_git}/dawn.git@bf1c0cf52377b4db2bf3a433dc5056620aad7cdd'
+    'url': '{dawn_git}/dawn.git@fec381741e7fbeb581f1ea0af08b11552680669b'
   },
 
   # Dependencies required for backends.

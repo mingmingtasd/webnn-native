@@ -39,12 +39,14 @@ void WebnnTest::TearDown() {
     ASSERT_FALSE(mExpectError);
 }
 
-void WebnnTest::StartExpectContextError() {
+void WebnnTest::StartExpectContextError(testing::Matcher<std::string> errorMatcher) {
     mExpectError = true;
     mError = false;
+    mErrorMatcher = errorMatcher;
 }
 bool WebnnTest::EndExpectContextError() {
     mExpectError = false;
+    mErrorMatcher = testing::_;
     return mError;
 }
 

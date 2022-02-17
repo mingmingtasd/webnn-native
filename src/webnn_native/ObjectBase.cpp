@@ -29,7 +29,7 @@ namespace webnn_native {
     }
 
     ContextBase* ObjectBase::GetContext() const {
-        return mContext.Get();
+        return mContext;
     }
 
     bool ObjectBase::IsError() const {

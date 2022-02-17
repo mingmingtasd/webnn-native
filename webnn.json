@@ -15,6 +15,16 @@
     "See the License for the specific language governing permissions and",
     "limitations under the License."
   ],
+
+  "_metadata": {
+    "api": "WebNN",
+    "c_prefix": "WNN",
+    "namespace": "wnn",
+    "proc_table_prefix": "Webnn",
+    "native_namespace": "webnn native",
+    "copyright_year": "2019"
+},
+
   "instance descriptor": {
     "category": "structure",
     "members": []
@@ -118,13 +128,12 @@
   "error filter": {
     "category": "enum",
     "values": [
-        {"value": 0, "name": "none"},
-        {"value": 1, "name": "validation"},
-        {"value": 2, "name": "out of memory"}
+        {"value": 0, "name": "validation"},
+        {"value": 1, "name": "out of memory"}
     ]
   },
   "error callback": {
-    "category": "callback",
+    "category": "function pointer",
     "args": [
         {"name": "type", "type": "error type"},
         {"name": "message", "type": "char", "annotation": "const*"},
