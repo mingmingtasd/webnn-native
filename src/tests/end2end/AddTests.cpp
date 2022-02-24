@@ -102,11 +102,11 @@ TEST_F(AddTests, AddTwoInputs) {
 }
 
 TEST_F(AddTests, AddBroadcast) {
-    const ml::GraphBuilder builder = ml::CreateGraphBuilder(GetContext());
-    const ml::Operand a = utils::BuildInput(builder, "a", {3, 4, 5});
-    const ml::Operand b = utils::BuildInput(builder, "b", {5});
-    const ml::Operand c = builder.Add(a, b);
-    const ml::Graph graph = utils::Build(builder, {{"c", c}});
+    const wnn::GraphBuilder builder = wnn::CreateGraphBuilder(GetContext());
+    const wnn::Operand a = utils::BuildInput(builder, "a", {3, 4, 5});
+    const wnn::Operand b = utils::BuildInput(builder, "b", {5});
+    const wnn::Operand c = builder.Add(a, b);
+    const wnn::Graph graph = utils::Build(builder, {{"c", c}});
     ASSERT_TRUE(graph);
     const std::vector<float> dataA = {
         -0.08539673, 0.11800674,  -1.2358714,  0.30089188,  -0.73443925, 1.4894297,   0.16823359,

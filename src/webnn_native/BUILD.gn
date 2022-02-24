@@ -214,6 +214,8 @@ source_set("webnn_native_sources") {
 
   if (webnn_enable_dml) {
     sources += [
+      "dml/BackendDML.cpp",
+      "dml/BackendDML.h",
       "dml/ContextDML.cpp",
       "dml/ContextDML.h",
       "dml/DMLUtils.h",
