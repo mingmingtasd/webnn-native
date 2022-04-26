@@ -15,11 +15,14 @@
 #ifndef WEBNN_NATIVE_DML_MODEL_DML_H_
 #define WEBNN_NATIVE_DML_MODEL_DML_H_
 
-#include <map>
-#include <mutex>
-#include <set>
+#define DML_TARGET_VERSION_USE_LATEST 1
+
+#include <dxgi1_4.h>
+#include <dxgi1_6.h>
+#include <wrl\client.h>
 #include <unordered_set>
 
+#include "DirectML.h"
 #include "webnn_native/Graph.h"
 #include "webnn_native/Operand.h"
 #include "webnn_native/Operator.h"
@@ -45,29 +48,46 @@
 #include "webnn_native/ops/Squeeze.h"
 #include "webnn_native/ops/Transpose.h"
 #include "webnn_native/ops/Unary.h"
+namespace webnn_native { namespace dml {
 
-#if defined(WEBNN_ENABLE_GPU_BUFFER)
-// Support DirectMLX
-#    include <initguid.h>
-#    include <wrl/client.h>
-#    include <wrl/implements.h>
+    using namespace Microsoft::WRL;
 
-#    include <Windows.h>
-#    include <d3d12.h>
+    // Represent the DirectML tensor description.
+    struct DmlTensorDesc {
+        std::vector<UINT> dimensions = {};
+        std::vector<UINT> strides = {};
+        // Describes a tensor that will be stored in a Direct3D 12 buffer resource.
+        DML_BUFFER_TENSOR_DESC bufferDesc = {};
+    };
 
-#    define DML_TARGET_VERSION_USE_LATEST 1
-#    include <DirectML.h>
-#    include "DirectMLX.h"
+    // Represent the information of the graph's edges.
+    struct EdgeInfoBase {
+        virtual ~EdgeInfoBase() = default;
+        DML_TENSOR_DESC outputTensorDESC = {};
+        std::string name = "";
+        bool isInputEdge = false;
+    };
 
-#    include "dawn/native/dml/deps/src/dmldevice.h"
-#else
-#    include "webnn_native/dml/deps/src/precomp.h"
-#endif
+    // Only represent the information of the input edges.
+    struct InputEdgeInfo final : public EdgeInfoBase {
+        ~InputEdgeInfo() override = default;
+        // Indicate the index of the graph's input.
+        size_t inputIndex = 0;
+        void const* buffer = nullptr;
+        size_t byteLength = 0;
+        // Indicate if the input is from constant buffer which need to be
+        // uploaded in the stage of initialization.
+        bool isConstantInput = false;
+    };
 
-namespace webnn_native::dml {
-
-    std::string DmlTensorDimensionsToString(const ::dml::TensorDimensions&);
-    std::string DmlTensorDataTypeToString(DML_TENSOR_DATA_TYPE type);
+    // Represent the information of the intermediate edges and output edges.
+    struct EdgeInfo final : public EdgeInfoBase {
+        ~EdgeInfo() override = default;
+        // Indicate the index of the intermediate node from which this edge was produced.
+        uint32_t nodeIndex = 0;
+        // Indicate the index of the intermediate node' output from which this edge was produced.
+        uint32_t outputNodeIndex = 0;
+    };
 
     class Graph : public GraphBase {
       public:
@@ -98,39 +118,80 @@ namespace webnn_native::dml {
         virtual MaybeError AddInstanceNorm(const op::InstanceNorm* instanceNorm) override;
         virtual MaybeError Finish() override;
 
+        void AddEdgesToThisNode(std::vector<std::shared_ptr<EdgeInfoBase>> inputNodes);
+        void FillUploadResourceAndInputBindings(uint64_t uploadResourceSize,
+                                                std::vector<DML_BUFFER_BINDING>& inputBufferBinding,
+                                                std::map<std::string, Input> namedInputs = {});
+        MaybeError createConstantInput(DML_TENSOR_DESC& inputTensorDESC,
+                                       void const* value,
+                                       size_t size,
+                                       const std::vector<UINT>& dmlTensorDims,
+                                       const std::vector<UINT>& strides = {},
+                                       DML_TENSOR_DATA_TYPE dataType = DML_TENSOR_DATA_TYPE_FLOAT32,
+                                       DML_TENSOR_FLAGS tensorFlag = DML_TENSOR_FLAG_OWNED_BY_DML);
+        std::shared_ptr<EdgeInfoBase> Clamp(const op::ClampBase* clamp,
+                                            std::shared_ptr<EdgeInfoBase> inputEdge);
+        MaybeError HardSwish(std::shared_ptr<EdgeInfoBase>& inputEdge,
+                             const std::vector<UINT>& inputDims);
+        MaybeError EmulateFusedOperator(FusionOperatorBase* activation,
+                                        std::shared_ptr<EdgeInfoBase>& inputEdge,
+                                        const std::vector<UINT>& inputDims);
+        MaybeError TransposeOutputToNhwc(std::shared_ptr<EdgeInfoBase>& inputEdge,
+                                         const std::vector<UINT>& nchwOutputDims);
+
       private:
         MaybeError CompileImpl() override;
         MaybeError ComputeImpl(NamedInputsBase* inputs, NamedOutputsBase* outputs) override;
 
-        ::dml::Expression BindingConstant(DML_TENSOR_DATA_TYPE dmlTensorType,
-                                          ::dml::TensorDimensions dmlTensorDims,
-                                          void const* value,
-                                          size_t size
-#ifdef WEBNN_ENABLE_GPU_BUFFER
-                                          ,
-                                          WGPUBuffer wgpuBuffer = nullptr
-#endif
-        );
-        ::dml::Expression HardSwish(::dml::Expression& input);
-        ::dml::Expression EmulateFusedActivation(FusionOperatorBase* activation,
-                                                 ::dml::Expression& input);
+        // Represents a DirectML device, which is used to create operators, binding tables, command
+        // recorders, and other objects.
+        ComPtr<IDMLDevice> mDevice;
+        // The IDMLDevice1 interface inherits from IDMLDevice.
+        ComPtr<IDMLDevice1> mDevice1;
+        // Represents a virtual adapter; it is used to create command allocators, command lists,
+        // command queues, fences, resources, pipeline state objects, heaps, root signatures,
+        // samplers, and many resource views.
+        ComPtr<ID3D12Device> mD3D12Device;
 
-        std::shared_ptr<::pydml::Device> mDevice;
-        // The mutex is used to lock mDevice.
-        std::mutex mMutex;
-        std::unique_ptr<::dml::Graph> mGraph;
-        std::map<const OperandBase*, ::dml::Expression> mExpression;
-        std::vector<std::unique_ptr<::pydml::Binding>> mInputBindings;
-        std::map<std::string, ::pydml::Binding*> mInputBindingMap;
-        std::vector<std::unique_ptr<char>> mConstantBuffers;
+        ComPtr<IDMLCommandRecorder> mCommandRecorder;
+        ComPtr<ID3D12CommandQueue> mCommandQueue;
+        ComPtr<ID3D12CommandAllocator> mCommandAllocator;
+        ComPtr<ID3D12GraphicsCommandList> mCommandList;
+        ComPtr<IDMLBindingTable> mBindingTable;
+        ComPtr<ID3D12DescriptorHeap> mDescriptorHeap;
+
+        ComPtr<ID3D12Resource> mUploadResource;
+        ComPtr<ID3D12Resource> mInputResource;
+        ComPtr<ID3D12Resource> mTemporaryResource;
+        ComPtr<ID3D12Resource> mPersistentResource;
+
+        // Describe a graph of DirectML operators used to compile a combined, optimized operator.
+        std::vector<std::shared_ptr<InputEdgeInfo>> mInputs;
+        std::vector<EdgeInfo> mOutputs;
+        std::vector<DML_GRAPH_NODE_DESC> mIntermediateNodes;
+        std::vector<DML_GRAPH_EDGE_DESC> mInputEdges;
+        std::vector<DML_GRAPH_EDGE_DESC> mOutputEdges;
+        std::vector<DML_GRAPH_EDGE_DESC> mIntermediateEdges;
+
+        // IDMLCompiledOperator represents the DirectML graph's output which need to be initialized
+        // by IDMLOperatorInitializer.
+        ComPtr<IDMLCompiledOperator> mCompiledOperator;
+
+        std::map<const OperandBase*, std::shared_ptr<EdgeInfoBase>> mGraphEdgesMap;
+
+        // Keep intermediate nodes here to avoid releasing too early.
+        std::map<uint32_t, ComPtr<IDMLOperator>> mIntermediateNodesMap;
+        // Keep the input tensors description here to avoid releasing too early.
+        std::vector<std::shared_ptr<DmlTensorDesc>> mDmlTensorsDesc;
+        // Keep the descriptions of nodes and edges here to avoid releasing too early.
+        std::vector<std::unique_ptr<DML_OPERATOR_GRAPH_NODE_DESC>> mIntermediateNodesDesc;
+        std::vector<std::unique_ptr<DML_INPUT_GRAPH_EDGE_DESC>> mInputEdgesDesc;
+        std::vector<std::unique_ptr<DML_OUTPUT_GRAPH_EDGE_DESC>> mOutputEdgesDesc;
+        std::vector<std::unique_ptr<DML_INTERMEDIATE_GRAPH_EDGE_DESC>> mIntermediateEdgesDesc;
         std::unordered_set<const OperandBase*> mConstantSet;
-        std::vector<Ref<OperandBase>> mConstants;
-        std::map<std::string, ::dml::Expression> mOutputExpressionMap;
-        std::vector<std::unique_ptr<::pydml::Binding>> mOutputBindings;
-        std::map<std::string, ::pydml::Binding*> mOutputBindingMap;
-        std::unique_ptr<pydml::CompiledModel> mCompiledModel;
+        std::vector<std::unique_ptr<char>> mConstantsBuffer;
     };
 
-}  // namespace webnn_native::dml
+}}  // namespace webnn_native::dml
 
 #endif  // WEBNN_NATIVE_DML_MODEL_DML_H_

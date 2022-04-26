@@ -213,17 +213,6 @@ source_set("webnn_native_sources") {
   }
 
   if (webnn_enable_dml) {
-    if (webnn_enable_gpu_buffer == false) {
-      sources += [
-        "dml/deps/src/device.cpp",
-        "dml/deps/src/device.h",
-        "dml/deps/src/model.h",
-        "dml/deps/src/precomp.h",
-        "dml/deps/src/typeconvert.h",
-        "dml/deps/src/util.cpp",
-        "dml/deps/src/util.h",
-      ]
-    }
     sources += [
       "dml/BackendDML.cpp",
       "dml/BackendDML.h",
@@ -231,14 +220,13 @@ source_set("webnn_native_sources") {
       "dml/ContextDML.h",
       "dml/GraphDML.cpp",
       "dml/GraphDML.h",
+      "dml/DMLUtils.h",
     ]
 
     include_dirs +=
         [ "${webnn_root}/third_party/microsoft.ai.directml.1.6.0/include" ]
     if (build_with_chromium) {
       include_dirs += [ "${webnn_dawn_root}/src/dawn/native/dml/deps/src" ]
-    } else {
-      include_dirs += [ "${webnn_root}/third_party/DirectML/Libraries" ]
     }
 
     lib_dirs +=
