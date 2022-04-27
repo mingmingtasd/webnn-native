@@ -32,7 +32,7 @@ namespace webnn_native {
         virtual ~OperandBase() = default;
 
         const OperatorBase* Operator() {
-            return mOperator.Get();
+            return mOperator;
         }
 
         ml::OperandType Type() const {
@@ -55,7 +55,7 @@ namespace webnn_native {
 
       protected:
         // The operator of generating the operand.
-        Ref<OperatorBase> mOperator;
+        OperatorBase* mOperator;
         // The operand type.
         ml::OperandType mType;
         // only set rank for dimensions
