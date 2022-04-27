@@ -96,6 +96,7 @@ namespace webnn_native {
         GraphBase* Build(NamedOperandsBase const* namedOperands);
 
       private:
+        std::vector<Ref<OperatorBase>> mOperators;
         // Topological sort of nodes needed to compute rootNodes
         std::vector<const OperatorBase*> TopologicalSort(
             std::vector<const OperandBase*>& rootNodes);

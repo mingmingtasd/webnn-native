@@ -54,6 +54,7 @@
     if (GetContext()->ConsumedError(op->Validate())) { \
         return objectBase::MakeError(this);            \
     }                                                  \
+    mOperators.push_back(op);                          \
     for (;;)                                           \
     break
 
