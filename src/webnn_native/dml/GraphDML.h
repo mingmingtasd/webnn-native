@@ -176,6 +176,9 @@ namespace webnn_native { namespace dml {
         // IDMLCompiledOperator represents the DirectML graph's output which need to be initialized
         // by IDMLOperatorInitializer.
         ComPtr<IDMLCompiledOperator> mCompiledOperator;
+        DML_BINDING_TABLE_DESC mBindingTableDesc;
+        UINT64 mTemporaryResourceSize;
+        UINT64 mPersistentResourceSize;
 
         std::map<const OperandBase*, std::shared_ptr<EdgeInfoBase>> mGraphEdgesMap;
 
