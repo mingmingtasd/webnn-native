@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "DeviceDML.h"
+#include <algorithm>
 
 namespace webnn::native::dml {
 
@@ -43,6 +44,79 @@ namespace webnn::native::dml {
         return device;
     }
 
+    ComPtr<IDXCoreAdapter> TryFindComputeAdapter() {
+        // You begin DXCore adapter enumeration by creating an adapter factory.
+        ComPtr<IDXCoreAdapterFactory> adapterFactory;
+        DXCoreCreateAdapterFactory(adapterFactory.GetAddressOf());
+
+        // From the factory, retrieve a list of all the Direct3D 12 Core Compute adapters.
+        ComPtr<IDXCoreAdapterList> d3D12CoreComputeAdapters;
+        GUID attributes[]{DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE};
+        adapterFactory->CreateAdapterList(_countof(attributes), attributes,
+                                          d3D12CoreComputeAdapters.GetAddressOf());
+
+        // If there are any hardware adapters, then choose the first.
+        // Otherwise, choose the first sofware adapter.
+        ComPtr<IDXCoreAdapter> preferredAdapter;
+
+        const uint32_t count{d3D12CoreComputeAdapters->GetAdapterCount()};
+        dawn::WarningLog() << "count" << count;
+
+        for (uint32_t i = 0; i < count; ++i) {
+            ComPtr<IDXCoreAdapter> candidateAdapter;
+            d3D12CoreComputeAdapters->GetAdapter(i, candidateAdapter.GetAddressOf());
+            dawn::WarningLog() << "=================";
+            dawn::WarningLog() << "adapter index" << i;
+
+            bool isHardware{false};
+            candidateAdapter->GetProperty(DXCoreAdapterProperty::IsHardware, &isHardware);
+
+            bool isIntegrated{false};
+            candidateAdapter->GetProperty(DXCoreAdapterProperty::IsIntegrated, &isIntegrated);
+
+            if (isHardware) {
+                // Choose the first hardware adapter, and stop looping.
+                preferredAdapter = candidateAdapter;
+                // break;
+            } else {
+                // Choose the first hardware adapter, and stop looping
+            }
+
+            HRESULT hr;
+            if (candidateAdapter->IsPropertySupported(DXCoreAdapterProperty::DriverDescription)) {
+                size_t bufferSize;
+                hr = candidateAdapter->GetPropertySize(DXCoreAdapterProperty::DriverDescription,
+                                                       &bufferSize);
+                char* driverDesc = new char[bufferSize];
+                hr = candidateAdapter->GetProperty(DXCoreAdapterProperty::DriverDescription,
+                                                   bufferSize, driverDesc);
+                if (FAILED(hr)) {
+                    dawn::WarningLog() << "Failed to try to read property";
+                    return nullptr;
+                } else {
+                    dawn::WarningLog() << "driverDesc: " << driverDesc;
+                }
+
+                std::string driverDescStr = std::string(driverDesc);
+                std::transform(driverDescStr.begin(), driverDescStr.end(), driverDescStr.begin(),
+                               ::tolower);
+
+                if (driverDescStr.find("vpu") != std::string::npos) {
+                    dawn::WarningLog() << "Aapter type is VPU";
+                    preferredAdapter = candidateAdapter;
+                    break;
+                }
+
+                delete[] driverDesc;
+            } else {
+                dawn::WarningLog() << "Failed to try to find property";
+            }
+        }
+
+        dawn::WarningLog() << "selected preferredAdapter";
+        return preferredAdapter;
+    }
+
     HRESULT Device::Init() {
         if (mDesc.useDebugLayer) {
             ComPtr<ID3D12Debug> debug;
@@ -51,38 +125,35 @@ namespace webnn::native::dml {
             }
         }
 
-        ComPtr<IDXGIAdapter1> dxgiAdapter;
-        if (mDesc.useGpu) {
-            ComPtr<IDXGIFactory6> dxgiFactory;
-            RETURN_IF_FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
-            UINT i = 0;
-            while (dxgiFactory->EnumAdapterByGpuPreference(i++, mDesc.gpuPreference,
-                                                           IID_PPV_ARGS(&dxgiAdapter)) !=
-                   DXGI_ERROR_NOT_FOUND) {
-                if (!IsWarpAdapter(dxgiAdapter.Get())) {
-                    break;
-                }
-            }
+        // dxcore
+
+        // winrt::init_apartment();
+
+        // Example 1.
+        ComPtr<IDXCoreAdapter> computeAdapter = TryFindComputeAdapter();
+        D3D_FEATURE_LEVEL d3dFeatureLevel = D3D_FEATURE_LEVEL_1_0_CORE;
+        if (computeAdapter->IsAttributeSupported(DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS)) {
+            dawn::WarningLog() << "DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS Supported";
+            d3dFeatureLevel = D3D_FEATURE_LEVEL_11_0;
+        } else {
+            dawn::WarningLog() << "DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS Not Supported";
         }
-        if (!mDesc.useGpu || FAILED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                                      IID_PPV_ARGS(&mD3D12Device)))) {
-            // If a computer's display driver is not functioning or is disabled, the computer's
-            // primary (NULL) adapter might also be called "Microsoft Basic Render Driver."
-            ComPtr<IDXGIFactory4> dxgiFactory;
-            RETURN_IF_FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)));
-            RETURN_IF_FAILED(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&dxgiAdapter)));
-            RETURN_IF_FAILED(D3D12CreateDevice(dxgiAdapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                               IID_PPV_ARGS(&mD3D12Device)));
+
+        IUnknown* pAdapter = computeAdapter.Get();
+        HRESULT hr =
+            D3D12CreateDevice(pAdapter, d3dFeatureLevel, IID_PPV_ARGS(&mD3D12Device));
+        if (FAILED(hr)) {
+            dawn::WarningLog() << "Failed to D3D12CreateDevice" << hr;
         }
 
         D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
-        commandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+        commandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
         commandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
         RETURN_IF_FAILED(
             mD3D12Device->CreateCommandQueue(&commandQueueDesc, IID_PPV_ARGS(&mCommandQueue)));
-        RETURN_IF_FAILED(mD3D12Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+        RETURN_IF_FAILED(mD3D12Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE,
                                                               IID_PPV_ARGS(&mCommandAllocator)));
-        RETURN_IF_FAILED(mD3D12Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+        RETURN_IF_FAILED(mD3D12Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
                                                          mCommandAllocator.Get(), nullptr,
                                                          IID_PPV_ARGS(&mCommandList)));
 

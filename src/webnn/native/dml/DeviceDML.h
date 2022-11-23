@@ -22,6 +22,16 @@
 #include "webnn/native/NamedOutputs.h"
 #include "webnn/native/webnn_platform.h"
 
+// pch.h
+#pragma once
+// #include <algorithm>
+// #include <functional>
+
+#include <dxcore.h>
+// #include <initguid.h>
+// #include <unknwn.h>
+// #include <winrt/base.h>
+
 namespace webnn::native::dml {
 
     inline D3D12_HEAP_PROPERTIES CreateHeapProperties(

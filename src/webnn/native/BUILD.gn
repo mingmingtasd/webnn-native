@@ -266,6 +266,7 @@ source_set("sources") {
       "dxgi.lib",
       "d3d12.lib",
       "directml.lib",
+      "dxcore.lib",
     ]
 
     if (build_with_chromium) {
