@@ -449,7 +449,11 @@ namespace utils {
 
     void PrintExexutionTime(std::vector<TIME_TYPE> executionTime) {
         size_t nIter = executionTime.size();
-        if (executionTime.size() > 1) {
+        if (nIter > 1) {
+            for (size_t i = 0; i < nIter && i < nIter; i++) {
+                dawn::InfoLog() << "Execution Time of iteration " << i << " is "
+                                << executionTime[i].count() << " ms";
+            }
             std::sort(executionTime.begin(), executionTime.end());
             TIME_TYPE medianExecutionTime =
                 nIter % 2 != 0 ? executionTime[floor(nIter / 2)]

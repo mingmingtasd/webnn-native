@@ -58,10 +58,10 @@ int main(int argc, const char* argv[]) {
 
     // Compute the graph.
     std::vector<float> result(utils::SizeOfShape(mobilevetv2.mOutputShape));
-    // Do the first inference for warming up if nIter > 1.
-    if (mobilevetv2.mNIter > 1) {
-        utils::Compute(graph, {{"input", processedPixels}}, {{"output", result}});
-    }
+    // // Do the first inference for warming up if nIter > 1.
+    // if (mobilevetv2.mNIter > 1) {
+    //     utils::Compute(graph, {{"input", processedPixels}}, {{"output", result}});
+    // }
 
     std::vector<TIME_TYPE> executionTime;
     for (int i = 0; i < mobilevetv2.mNIter; ++i) {
